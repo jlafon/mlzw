@@ -1,0 +1,47 @@
+#include <stdio.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include "mlzw.h"
+
+int main(int argc, char **argv)
+{
+    mlzw_handle * handle = mlzw_new();
+    struct stat st;
+    int fd = open(argv[1],O_RDONLY);
+    if(fd == -1)
+    {
+        printf("Unable to open file %s\n",argv[1]);
+        return -1;
+    }
+    fstat(fd,&st);
+    char * input = calloc(sizeof(char),st.st_size);
+    read(fd,input,st.st_size);
+    close(fd);
+    mlzw_make_dict(handle,input,st.st_size);
+    
+    printf("Dictionary size: %d\n",handle->dictionary->size);
+    char *sample = "<data key=\"name\">rrj203_HCA_1</data>"; 
+    mlzw_encoding * compressed = mlzw_encode(handle,sample,strlen(sample)+1);
+//    fd = open("compressed.lzw",O_CREAT | O_TRUNC | O_WRONLY, 0644);
+  //  write(fd,compressed->data,compressed->size);
+   // close(fd);
+
+//    fd = open("compressed.lzw",O_RDONLY);
+  //  fstat(fd,&st);
+    //input = calloc(sizeof(char),st.st_size);
+   // read(fd,input,st.st_size);
+  //  close(fd);
+   
+      mlzw_encoding * decompressed = mlzw_decode(handle,compressed->data,compressed->size);
+      printf("Original text: [%s]\n",sample);
+      printf("Decoded text: [%s]\n",decompressed->data);
+   // fd = open("decompressed.txt",O_CREAT | O_TRUNC | O_WRONLY, 0644);
+   // write(fd,decompressed->data,decompressed->size);
+   // close(fd);
+
+//    mlzw_save_handle(handle,"test.hdl");
+  //  mlzw_load_handle(restored,"test.hdl");
+    //printf("Dictionary size: %d\n",restored->dictionary->size);
+}
