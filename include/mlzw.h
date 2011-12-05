@@ -15,7 +15,6 @@ typedef struct mlzw_sorted_list_t
     uint32_t value;
     uint32_t hits;
     struct mlzw_sorted_list_t * next;
-    struct mlzw_sorted_list_t * prev;
     struct mlzw_sorted_list_t * left;
     struct mlzw_sorted_list_t * right;
     uint8_t weight;

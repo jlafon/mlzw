@@ -43,22 +43,22 @@ int main(int argc, char **argv)
     const long long unsigned delta = time_ns (&ts) - start_ns;
     printf("Bandwidth: %f b/s\n",1000000000*(double)st.st_size/((double)delta));
     mlzw_create_sampling(handle,input,st.st_size);
-    mlzw_encoding * huffman_compressed = mlzw_huffman_encode(handle,input,st.st_size);
-    fd = open("compressed.lzw",O_CREAT | O_TRUNC | O_WRONLY, 0644);
-    write(fd,compressed->data,compressed->size);
-    close(fd);
+  //  mlzw_encoding * huffman_compressed = mlzw_huffman_encode(handle,input,st.st_size);
+//    fd = open("compressed.lzw",O_CREAT | O_TRUNC | O_WRONLY, 0644);
+  //  write(fd,compressed->data,compressed->size);
+    //close(fd);
 
-    fd = open("compressed.lzw",O_RDONLY);
-    fstat(fd,&st);
-    input = calloc(sizeof(char),st.st_size);
-    read(fd,input,st.st_size);
-    close(fd);
-    mlzw_encoding * decompressed = mlzw_decode(handle,compressed->data,compressed->size);
+//    fd = open("compressed.lzw",O_RDONLY);
+  //  fstat(fd,&st);
+    //input = calloc(sizeof(char),st.st_size);
+ //   read(fd,input,st.st_size);
+   // close(fd);
+//    mlzw_encoding * decompressed = mlzw_decode(handle,compressed->data,compressed->size);
 //    printf("Original text: [%s]\n",sample);
   //  printf("Decoded text: [%s]\n",decompressed->data);
-      fd = open("decompressed.txt",O_CREAT | O_TRUNC | O_WRONLY, 0644);
-      write(fd,decompressed->data,decompressed->size);
-      close(fd);
+  //    fd = open("decompressed.txt",O_CREAT | O_TRUNC | O_WRONLY, 0644);
+    //  write(fd,decompressed->data,decompressed->size);
+      //close(fd);
 
 //    mlzw_save_handle(handle,"test.hdl");
   //  mlzw_load_handle(restored,"test.hdl");

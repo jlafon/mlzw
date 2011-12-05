@@ -16,7 +16,7 @@
 #define COMPRESSION_BITS 16
 
 /* Use a maximum of 64 bits to encode a symbol */
-#define MAX_TREE_DEPTH 64
+#define MAX_TREE_DEPTH 16
 
 #define bin_pattern "%u%u%u%u%u%u%u%u %u%u%u%u%u%u%u%u %u%u%u%u%u%u%u%u %u%u%u%u%u%u%u%u"
 #define binary(pattern) \
@@ -52,7 +52,18 @@
     (pattern &0x04 ? 1 : 0), \
     (pattern &0x02 ? 1 : 0), \
     (pattern &0x01 ? 1 : 0)
-
+typedef struct lzw_coin_t
+{
+    float denom;
+    int hits;
+    int code;
+    struct lzw_coin_t * next;
+} lzw_coin;
+typedef struct lzw_coin_pair_t
+{
+    lzw_coin * first;
+    lzw_coin * second;
+} lzw_coin_pair;
 mlzw_handle * mlzw_new()
 {
     mlzw_handle * h = calloc(1,sizeof(*h));
@@ -94,15 +105,51 @@ int mlzw_load_handle(mlzw_handle *h, char*filename)
     }
     return close(infd);
 }
+inline void print_coin_list(lzw_coin * hd)
+{
+    if(!hd)
+    {
+;    }
+    else
+    {
+        printf("\tCoin: %d Denom: %f Value: %d =>\n",hd->code, hd->denom,hd->hits);
+        print_coin_list(hd->next);
+    }
+}
+
+
+lzw_coin * coin_push(lzw_coin * hd, lzw_coin * nw)
+{
+        lzw_coin * tmp = hd;
+        if(!tmp)
+        {
+            return nw;
+        }
+        else
+        {
+            //print_coin_list(hd);
+            tmp = hd;
+            while(tmp->next && tmp->next->hits < nw->hits)
+                tmp = tmp->next;
+            if(tmp == hd)
+            {
+                nw->next = hd;
+                return nw;
+            }
+            else
+            {
+                nw->next = tmp->next;
+                tmp->next = nw;
+                return hd;
+            }
+        }
+}
 void
 mlzw_create_sampling(mlzw_handle *h, void * bytes, int size)
 {
     lzw_t *dictionary = h->dictionary;
-    lzw_t *decode_dict = h->reverse_dictionary;
     uint32_t c,code,nc;
-    off_t index = 0;
     uint64_t total = 0;
-    uint32_t depth = 0;
     int i = 0;
     uint64_t * frequency = calloc(1,sizeof(*frequency)*h->dictionary->size);
     uint32_t *huffman_dictionary = calloc(h->dictionary->size,sizeof(*huffman_dictionary));
@@ -110,16 +157,10 @@ mlzw_create_sampling(mlzw_handle *h, void * bytes, int size)
     mlzw_sorted_list * new;
     mlzw_sorted_list * head = NULL;
     mlzw_sorted_list * temp = NULL;
-    int new_value = 0;
-    typedef struct lzw_coin_t
-    {
-        float denom;
-        int hits;
-    } lzw_coin;
     typedef struct symbol_t
     {
         int code;
-        lzw_coin * coins; 
+        lzw_coin ** coins; 
     } symbol;
     inline void print_list()
     {
@@ -150,16 +191,12 @@ mlzw_create_sampling(mlzw_handle *h, void * bytes, int size)
             if(temp == head)
             {
                 new->next = head;
-                head->prev = new;
                 head = new;
             }
             else
             {
-                if(temp->next)
-                    temp->next->prev = new;
                 new->next = temp->next;
                 temp->next = new;
-                new->prev = temp;
             }
         }
 
@@ -203,20 +240,44 @@ mlzw_create_sampling(mlzw_handle *h, void * bytes, int size)
         int q,p;
         temp = head;
         /* Create a list of symbols, based on frequencies */
-        for(q=0; q< h->dictionary->size; q++)
+        lzw_coin *coinlist[COMPRESSION_BITS];
+        for(q=0;q<COMPRESSION_BITS;q++)
+            coinlist[q]=NULL;
+        while(temp)
         {
-            symbols[q].coins = calloc(COMPRESSION_BITS,sizeof(lzw_coin));
+            //printf("Creating %d coins for symbol %d of %d With freq: %u\n",COMPRESSION_BITS,temp->value,h->dictionary->size,temp->hits);
+            symbols[temp->value].coins = calloc(COMPRESSION_BITS,sizeof(*symbols[temp->value].coins));
             for(p=0; p < COMPRESSION_BITS; p++)
             {
-                symbols[q].coins[p].denom = p;
-                symbols[q].coins[p].hits = head->hits;
+                symbols[temp->value].coins[p] = calloc(1,sizeof(*symbols[temp->value].coins[p]));
+                symbols[temp->value].coins[p]->denom = p;
+                symbols[temp->value].coins[p]->hits = temp->hits;
+                symbols[temp->value].coins[p]->code = temp->value;
+//                printf("temp->value = %d temp->next = %p temp->next->value = %d\n",temp->value,temp->next,temp->next->value);
+                coinlist[p] = coin_push(coinlist[p],symbols[temp->value].coins[p]);
+  //              printf("temp->value = %d temp->next = %p temp->next->value = %d\n",temp->value,temp->next,temp->next->value);
+                
             }
-            symbols[q].code = head->value;
+            symbols[temp->value].code = temp->value;
+            printf("Done: %d\n",temp->value);
+            temp = temp->next;
         }
+        lzw_coin_pair ** coin_pair_list = calloc(1,sizeof(*coin_pair_list));
+        int coin_pair_count = 0;
         for(q=0; q< COMPRESSION_BITS; q++)
         {
-
+            printf("List: %d\n",q);
+            print_coin_list(coinlist[q]);
+            while(coinlist[q] && coinlist[q]->next)
+            {
+                coin_pair_list[coin_pair_count] = calloc(1,sizeof(lzw_coin_pair));
+                coin_pair_list[coin_pair_count]->first = coinlist[q];
+                coin_pair_list[coin_pair_count]->second = coinlist[q]->next;
+                coin_pair_count++;
+                coinlist[q] = coinlist[q]->next->next;
+            }
         }
+        
 
     }
     inline void generate_tree()
@@ -265,10 +326,11 @@ mlzw_create_sampling(mlzw_handle *h, void * bytes, int size)
             list_push();
         }
     }
-    print_list();
+//    print_list();
+    package_merge();
     generate_tree();
     //print_tree(head,0);
-    print_patterns(head, 0,1);
+//    print_patterns(head, 0,1);
     h->bits = bits;
     h->huffman_dict = huffman_dictionary;
 //    h->tree = head;
@@ -410,7 +472,7 @@ mlzw_encoding * mlzw_huffman_encode(mlzw_handle * h, void * bytes, int size)
                 output = realloc(output,output_size*sizeof(*output));
                 
             }
-            printf("Value: %d Code: %x Bits: %u\n",code,h->huffman_dict[code],h->bits[code]);
+//            printf("Value: %d Code: %x Bits: %u\n",code,h->huffman_dict[code],h->bits[code]);
             memcpy((output+index),&code,sizeof(code));
             index+=4;
             written += sizeof(code);
